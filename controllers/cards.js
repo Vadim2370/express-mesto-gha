@@ -32,9 +32,9 @@ const deleteCard = (req, res) => {
     .then((card) => {
       if (!card) {
         res.status(NOT_FOUND_ERR).send({ message: NOT_FOUND_CARD_ERR_MESSAGE });
-        return;
+      } else {
+        res.send({ message: `Карточка '${card.name}' удалена` });
       }
-      res.send({ message: `Карточка '${card.name}' удалена` });
     })
     .catch((err) => {
       if (err.name === 'CastError') {
@@ -54,8 +54,9 @@ const addLike = (req, res) => {
     .then((card) => {
       if (!card) {
         res.status(NOT_FOUND_ERR).send({ message: NOT_FOUND_CARD_ERR_MESSAGE });
+      } else {
+        res.send({ data: card });
       }
-      res.send({ data: card });
     })
     .catch((err) => {
       if (err.name === 'CastError') {
@@ -75,8 +76,9 @@ const deleteLike = (req, res) => {
     .then((card) => {
       if (!card) {
         res.status(NOT_FOUND_ERR).send({ message: NOT_FOUND_CARD_ERR_MESSAGE });
+      } else {
+        res.send({ data: card });
       }
-      res.send({ data: card });
     })
     .catch((err) => {
       if (err.name === 'CastError') {

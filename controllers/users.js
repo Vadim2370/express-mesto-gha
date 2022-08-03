@@ -19,9 +19,9 @@ const getUserById = (req, res) => {
     .then((user) => {
       if (!user) {
         res.status(NOT_FOUND_ERR).send({ message: NOT_FOUND_USER_ERR_MESSAGE });
-        return;
+      } else {
+        res.send({ data: user });
       }
-      res.send({ data: user });
     })
     .catch((err) => {
       if (err.name === 'CastError') {
@@ -55,9 +55,9 @@ const updateUserProfile = (req, res) => {
     .then((updateUser) => {
       if (!updateUser) {
         res.status(NOT_FOUND_ERR).send({ message: NOT_FOUND_USER_ERR_MESSAGE });
-        return;
+      } else {
+        res.send({ data: updateUser });
       }
-      res.send({ data: updateUser });
     })
     .catch((err) => {
       if (err.name === 'ValidationError') {
@@ -78,9 +78,9 @@ const updateUserAvatar = (req, res) => {
     .then((updateUser) => {
       if (!updateUser) {
         res.status(NOT_FOUND_ERR).send({ message: NOT_FOUND_USER_ERR_MESSAGE });
-        return;
+      } else {
+        res.send({ data: updateUser });
       }
-      res.send({ data: updateUser });
     })
     .catch((err) => {
       if (err.name === 'ValidationError') {
