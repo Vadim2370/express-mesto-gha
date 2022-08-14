@@ -1,100 +1,158 @@
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const User = require('../models/user');
-const {
-  BAD_REQUEST_ERR,
-  BAD_REQUEST_ERR_MESSAGE,
-  SERVER_ERR,
-  SERVER_ERR_MESSAGE,
-  NOT_FOUND_ERR,
-  NOT_FOUND_USER_ERR_MESSAGE,
-} = require('../utils/errors');
+const NotFoundError = require('../errors/NotFoundError');
+const BadRequestError = require('../errors/BadRequestError');
+const UnauthError = require('../errors/UnauthError');
+const EmailError = require('../errors/EmailError');
 
-const getUsers = (req, res) => {
+const JWT_KEY = 'super-strong-secret';
+
+const getUsers = (req, res, next) => {
   User.find({})
     .then((users) => res.send({ data: users }))
-    .catch(() => res.status(SERVER_ERR).send({ message: SERVER_ERR_MESSAGE }));
+    .catch(next);
 };
 
-const getUserById = (req, res) => {
+const getUserInfo = (req, res, next) => {
+  const { _id } = req.user;
+  User.findById(_id)
+    .then((user) => {
+      if (!user) {
+        throw new NotFoundError('Нет такого пользователя');
+      } else {
+        res.send({ data: user });
+      }
+    })
+    .catch(next);
+};
+
+const getUserById = (req, res, next) => {
   User.findById(req.params.userId)
     .then((user) => {
       if (!user) {
-        res.status(NOT_FOUND_ERR).send({ message: NOT_FOUND_USER_ERR_MESSAGE });
+        throw new NotFoundError('Нет такого пользователя');
       } else {
         res.send({ data: user });
       }
     })
     .catch((err) => {
       if (err.name === 'CastError') {
-        res.status(BAD_REQUEST_ERR).send({ message: BAD_REQUEST_ERR_MESSAGE });
-        return;
+        next(new BadRequestError('Неверный запрос'));
+      } else {
+        next(err);
       }
-      res.status(SERVER_ERR).send({ message: SERVER_ERR_MESSAGE });
     });
 };
 
-const createUser = (req, res) => {
-  const { name, about, avatar } = req.body;
-  User.create({ name, about, avatar })
-    .then((newUser) => res.status(201).send({ data: newUser }))
+const createUser = (req, res, next) => {
+  const {
+    name,
+    about,
+    avatar,
+    email,
+    password,
+  } = req.body;
+  bcrypt
+    .hash(password, 10)
+    .then((hash) => User.create({
+      name,
+      about,
+      avatar,
+      email,
+      password: hash,
+    }))
+    .then((newUser) => res.status(201).send({
+      data: {
+        _id: newUser._id,
+        name: newUser.name,
+        about: newUser.about,
+        avatar: newUser.avatar,
+        email: newUser.email,
+      },
+    }))
     .catch((err) => {
       if (err.name === 'ValidationError') {
-        res.status(BAD_REQUEST_ERR).send({ message: BAD_REQUEST_ERR_MESSAGE });
-        return;
+        next(new BadRequestError('Неверный запрос'));
       }
-      res.status(SERVER_ERR).send({ message: SERVER_ERR_MESSAGE });
+      if (err.code === 11000) {
+        next(new EmailError('Неверный email'));
+      } else {
+        next(err);
+      }
     });
 };
 
-const updateUserProfile = (req, res) => {
+const updateUserProfile = (req, res, next) => {
   const { name, about } = req.body;
-  User.findByIdAndUpdate(
-    req.user._id,
-    { name, about },
-    { new: true, runValidators: true },
-  )
+  User.findByIdAndUpdate(req.user._id, { name, about }, { new: true, runValidators: true })
     .then((updateUser) => {
       if (!updateUser) {
-        res.status(NOT_FOUND_ERR).send({ message: NOT_FOUND_USER_ERR_MESSAGE });
+        throw new NotFoundError('Нет такого пользователя');
       } else {
         res.send({ data: updateUser });
       }
     })
     .catch((err) => {
       if (err.name === 'ValidationError') {
-        res.status(BAD_REQUEST_ERR).send({ message: BAD_REQUEST_ERR_MESSAGE });
-        return;
+        next(new BadRequestError('Неверный запрос'));
+      } else {
+        next(err);
       }
-      res.status(SERVER_ERR).send({ message: SERVER_ERR_MESSAGE });
     });
 };
 
-const updateUserAvatar = (req, res) => {
+const updateUserAvatar = (req, res, next) => {
+  const { _id } = req.user;
   const { avatar } = req.body;
-  User.findByIdAndUpdate(
-    req.user._id,
-    { avatar },
-    { new: true, runValidators: true },
-  )
+  User.findByIdAndUpdate(_id, { avatar }, { new: true, runValidators: true })
     .then((updateUser) => {
       if (!updateUser) {
-        res.status(NOT_FOUND_ERR).send({ message: NOT_FOUND_USER_ERR_MESSAGE });
+        throw new NotFoundError('Нет такого пользователя');
       } else {
         res.send({ data: updateUser });
       }
     })
     .catch((err) => {
       if (err.name === 'ValidationError') {
-        res.status(BAD_REQUEST_ERR).send({ message: BAD_REQUEST_ERR_MESSAGE });
-        return;
+        next(new BadRequestError('Неверный запрос'));
+      } else {
+        next(err);
       }
-      res.status(SERVER_ERR).send({ message: SERVER_ERR_MESSAGE });
     });
+};
+
+const login = (req, res, next) => {
+  const { email, password } = req.body;
+  User.findOne({ email }).select('+password')
+    .then((user) => {
+      if (!user) {
+        throw new UnauthError('Неверный пароль или email');
+      }
+      return Promise.all([user, bcrypt.compare(password, user.password)]);
+    })
+    .then(([user, isLoggedIn]) => {
+      if (!isLoggedIn) {
+        throw new UnauthError('Неверный пароль или email');
+      }
+      const token = jwt.sign({ _id: user._id }, JWT_KEY, { expiresIn: '7d' });
+      res.cookie('jwt', token, {
+        maxAge: 3600000 * 24 * 7,
+        httpOnly: true,
+        sameSite: true,
+      });
+      res.send({ token });
+    })
+    .catch(next);
 };
 
 module.exports = {
   getUsers,
+  getUserInfo,
   getUserById,
   createUser,
   updateUserProfile,
   updateUserAvatar,
+  login,
+  JWT_KEY,
 };

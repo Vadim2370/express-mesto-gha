@@ -1,14 +1,17 @@
 const router = require('express').Router();
-
+const { errors } = require('celebrate');
+const auth = require('../middlewares/auth');
 const userRouter = require('./users');
 const cardRouter = require('./cards');
+const publicRouter = require('./public');
+const NotFoundError = require('../errors/NotFoundError');
 
-const { NOT_FOUND_ERR, NOT_FOUND_URL_ERR_MESSAGE } = require('../utils/errors');
-
-router.use(userRouter);
-router.use(cardRouter);
-router.use((req, res) => {
-  res.status(NOT_FOUND_ERR).send({ message: NOT_FOUND_URL_ERR_MESSAGE });
+router.use(publicRouter);
+router.use(auth, userRouter);
+router.use(auth, cardRouter);
+router.use(errors());
+router.use(auth, (req, res, next) => {
+  next(new NotFoundError('Страница не найдена'));
 });
 
 module.exports = router;
