@@ -4,5 +4,8 @@ const { signInValidation, signUpValidation } = require('../middlewares/validatio
 
 router.post('/signin', signInValidation, login);
 router.post('/signup', signUpValidation, createUser);
+router.get('/signout', (req, res) => {
+  res.clearCookie('jwt').send({ message: 'Выход' });
+});
 
 module.exports = router;
